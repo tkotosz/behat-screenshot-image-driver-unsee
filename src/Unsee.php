@@ -13,6 +13,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 class Unsee implements ImageDriverInterface
 {
     const CONFIG_PARAM_EXPIRE = 'expire';
+    const TO_SECONDS = 60;
 
     const REQUEST_URL = 'https://unsee.cc/upload/';
     const IMAGE_BASE_URL= 'https://unsee.cc/';
@@ -42,8 +43,9 @@ class Unsee implements ImageDriverInterface
     {
         $builder
             ->children()
-                ->scalarNode(self::CONFIG_PARAM_EXPIRE)
-                    ->defaultValue(600)
+                ->enumNode(self::CONFIG_PARAM_EXPIRE)
+                    ->values(array('10', '30', '60'))
+                    ->defaultValue('10')
                 ->end()
             ->end();
     }
@@ -82,7 +84,7 @@ class Unsee implements ImageDriverInterface
         $image = new FormUpload();
         $image->setFilename($filename);
         $image->setContent($binaryImage);
-        $expire = 600; //TODO get expire time from config (possible values: 0 , 600, 1800, 3600)
+        $expire = $this->expire * self::TO_SECONDS;
 
         $request = $this->buildRequest($image, $expire);
         $this->client->setOption(CURLOPT_TIMEOUT, 10000);
