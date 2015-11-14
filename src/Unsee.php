@@ -3,25 +3,23 @@
 namespace Bex\Behat\ScreenshotExtension\Driver;
 
 use Bex\Behat\ScreenshotExtension\Driver\ImageDriverInterface;
-use Buzz\Client\Curl;
-use Buzz\Message\Form\FormRequest;
-use Buzz\Message\Form\FormUpload;
-use Buzz\Message\Response;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Bex\Behat\ScreenshotExtension\Driver\Service\UnseeApi;
 
 class Unsee implements ImageDriverInterface
 {
     const CONFIG_PARAM_EXPIRE = 'expire';
-    const TO_SECONDS = 60;
-
-    const REQUEST_URL = 'https://unsee.cc/upload/';
-    const IMAGE_BASE_URL= 'https://unsee.cc/';
 
     /**
-     * @var Curl
+     * @var array
      */
-    private $client;
+    private $expireMapping = ['10m' => 600, '30m' => 1800, '1h' => 3600];
+
+    /**
+     * @var UnseeApi
+     */
+    private $api;
 
     /**
      * @var string
@@ -29,11 +27,11 @@ class Unsee implements ImageDriverInterface
     private $expire;
 
     /**
-     * @param Curl       $client
+     * @param UnseeApi $api
      */
-    public function __construct(Curl $client = null)
+    public function __construct(UnseeApi $api = null)
     {
-        $this->client = $client ?: new Curl();
+        $this->api = $api ?: new UnseeApi();
     }
 
     /**
@@ -44,8 +42,8 @@ class Unsee implements ImageDriverInterface
         $builder
             ->children()
                 ->enumNode(self::CONFIG_PARAM_EXPIRE)
-                    ->values(array('10', '30', '60'))
-                    ->defaultValue('10')
+                    ->values(array('10m', '30m', '1h'))
+                    ->defaultValue('10m')
                 ->end()
             ->end();
     }
@@ -56,7 +54,7 @@ class Unsee implements ImageDriverInterface
      */
     public function load(ContainerBuilder $container, array $config)
     {
-        $this->expire = $config[self::CONFIG_PARAM_EXPIRE];
+        $this->expire = $this->convertExpireValue($config[self::CONFIG_PARAM_EXPIRE]);
     }
 
     /**
@@ -67,62 +65,16 @@ class Unsee implements ImageDriverInterface
      */
     public function upload($binaryImage, $filename)
     {
-        $response = $this->callApi($binaryImage, $filename);
-        return $this->processResponse($response);
+        return $this->api->call($binaryImage, $filename, $this->expire);
     }
 
     /**
-     * @param  string $binaryImage
-     * @param  string $filename
+     * @param  string $expire
      *
-     * @return Response
+     * @return int
      */
-    private function callApi($binaryImage, $filename)
+    private function convertExpireValue($expire)
     {
-        $response = new Response();
-
-        $image = new FormUpload();
-        $image->setFilename($filename);
-        $image->setContent($binaryImage);
-        $expire = $this->expire * self::TO_SECONDS;
-
-        $request = $this->buildRequest($image, $expire);
-        $this->client->setOption(CURLOPT_TIMEOUT, 10000);
-        $this->client->send($request, $response);
-
-        return $response;
-    }
-
-    /**
-     * @param  Response $response
-     *
-     * @return string
-     */
-    private function processResponse(Response $response)
-    {
-        $responseData = json_decode($response->getContent(), true);
-
-        if (!isset($responseData['hash'])) {
-            throw new \RuntimeException('Screenshot upload failed');
-        }
-
-        return self::IMAGE_BASE_URL . $responseData['hash'];
-    }
-
-    /**
-     * @param  FormUpload $image
-     * @param  int        $expire
-     *
-     * @return FormRequest
-     */
-    private function buildRequest($image, $expire)
-    {
-        $request = new FormRequest();
-        
-        $request->fromUrl(self::REQUEST_URL);
-        $request->setField('image', $image);
-        $request->setField('time', $expire);
-
-        return $request;
+        return $this->expireMapping[$expire];
     }
 }
