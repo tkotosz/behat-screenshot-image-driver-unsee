@@ -10,7 +10,7 @@ use Buzz\Message\Response;
 class UnseeApi
 {
     const REQUEST_URL = 'https://unsee.cc/upload/';
-    const IMAGE_BASE_URL= 'https://unsee.cc/';
+    const IMAGE_BASE_URL = 'https://unsee.cc/';
 
     /**
      * @var Curl

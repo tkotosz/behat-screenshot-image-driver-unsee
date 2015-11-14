@@ -22,7 +22,7 @@ class Unsee implements ImageDriverInterface
     private $api;
 
     /**
-     * @var string
+     * @var int
      */
     private $expire;
 
